@@ -36,9 +36,15 @@ module Sidekiq
           chunk_size
       end
 
+      def pluck_size_for_flush
+        return 10000 if worker_class_options['force_drain']
+
+        pluck_size
+      end
+
       def pluck
         if @redis.lock(@name)
-          @redis.pluck(@name, pluck_size).map { |value| JSON.parse(value) }
+          @redis.pluck(@name, pluck_size_for_flush).map { |value| JSON.parse(value) }
         end
       end
 
@@ -47,7 +53,6 @@ module Sidekiq
         return unless chunk
 
         chunk.each_slice(chunk_size) do |subchunk|
-
           batches ||= {}
           subchunk.each do |job_arg|
             batches[job_arg['bid']] ||= []
