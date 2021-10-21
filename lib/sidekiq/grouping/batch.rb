@@ -12,7 +12,9 @@ module Sidekiq
 
       def add(msg)
         msg = msg.to_json
-        @redis.push_msg(@name, msg, enqueue_similar_once?) if should_add? msg
+        return false unless should_add?(msg)
+
+        @redis.push_msg(@name, msg, enqueue_similar_once?)
       end
 
       def should_add? msg
@@ -45,11 +47,22 @@ module Sidekiq
         return unless chunk
 
         chunk.each_slice(chunk_size) do |subchunk|
-          Sidekiq::Client.push(
-            'class' => @worker_class,
-            'queue' => @queue,
-            'args' => [true, subchunk]
-          )
+
+          batches ||= {}
+          subchunk.each do |job_arg|
+            batches[job_arg['bid']] ||= []
+            batches[job_arg['bid']] << job_arg['args']
+          end
+
+          batches.keys.each do |bid|
+            Sidekiq::Client.push(
+              'class' => @worker_class,
+              'queue' => @queue,
+              'args' => [true, batches[bid]],
+              'bid' => bid,
+              'batch_size': batches[bid].length
+            )
+          end
         end
         set_current_time_as_last
       end

@@ -32,9 +32,17 @@ module Sidekiq
       private
 
       def add_to_batch(worker_class, queue, msg, redis_pool = nil)
-        Sidekiq::Grouping::Batch
+        status = Sidekiq::Grouping::Batch
           .new(worker_class.name, queue, redis_pool)
-          .add(msg['args'])
+          .add({
+            args: msg['args'],
+            bid: msg[:bid]
+          })
+
+        if (!status)
+          batch = Thread.current[:batch]
+          batch.decrement_job_queue(msg['jid'])
+        end
 
         nil
       end
