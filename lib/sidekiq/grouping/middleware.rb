@@ -41,7 +41,7 @@ module Sidekiq
 
         if (!status)
           batch = Thread.current[:batch]
-          batch.decrement_job_queue(msg['jid'])
+          batch&.decrement_job_queue(msg['jid'])
         end
 
         nil
