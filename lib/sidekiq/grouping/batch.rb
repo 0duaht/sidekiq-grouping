@@ -1,7 +1,9 @@
+# frozen_string_literal: true
+
 module Sidekiq
   module Grouping
     class Batch
-      def initialize(worker_class, queue, redis_pool = nil)
+      def initialize(worker_class, queue, _redis_pool = nil)
         @worker_class = worker_class
         @queue = queue
         @name = "#{worker_class.underscore}:#{queue}"
@@ -12,13 +14,18 @@ module Sidekiq
 
       def add(msg)
         msg = msg.to_json
-        return false unless should_add?(msg)
+        return unless should_add? msg
 
-        @redis.push_msg(@name, msg, enqueue_similar_once?)
+        @redis.push_msg(
+          @name,
+          msg,
+          remember_unique: enqueue_similar_once?
+        )
       end
 
-      def should_add? msg
+      def should_add?(msg)
         return true unless enqueue_similar_once?
+
         !@redis.enqueued?(@name, msg)
       end
 
@@ -27,12 +34,12 @@ module Sidekiq
       end
 
       def chunk_size
-        worker_class_options['batch_size'] ||
+        worker_class_options["batch_size"] ||
           Sidekiq::Grouping::Config.max_batch_size
       end
 
       def pluck_size
-        worker_class_options['batch_flush_size'] ||
+        worker_class_options["batch_flush_size"] ||
           chunk_size
       end
 
@@ -43,9 +50,9 @@ module Sidekiq
       end
 
       def pluck
-        if @redis.lock(@name)
-          @redis.pluck(@name, pluck_size_for_flush).map { |value| JSON.parse(value) }
-        end
+        return unless @redis.lock(@name)
+
+        @redis.pluck(@name, pluck_size_for_flush).map { |value| JSON.parse(value) }
       end
 
       def flush
@@ -92,10 +99,11 @@ module Sidekiq
       end
 
       def next_execution_time
-        if interval = worker_class_options['batch_flush_interval']
-          last_time = last_execution_time
-          last_time + interval.seconds if last_time
-        end
+        interval = worker_class_options["batch_flush_interval"]
+        return unless interval
+
+        last_time = last_execution_time
+        last_time + interval.seconds if last_time
       end
 
       def delete
@@ -117,13 +125,13 @@ module Sidekiq
         if last_time.blank?
           set_current_time_as_last
           false
-        else
-          next_time < Time.now if next_time
+        elsif next_time
+          next_time < Time.now
         end
       end
 
       def enqueue_similar_once?
-        worker_class_options['batch_unique'] == true
+        worker_class_options["batch_unique"] == true
       end
 
       def set_current_time_as_last
@@ -140,7 +148,7 @@ module Sidekiq
         end
 
         def extract_worker_klass_and_queue(name)
-          klass, queue = name.split(':')
+          klass, queue = name.split(":")
           [klass.camelize, queue]
         end
       end
