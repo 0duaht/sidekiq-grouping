@@ -5,7 +5,7 @@ module Sidekiq
     class Middleware
       # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
       def call(worker_class, msg, queue, redis_pool = nil)
-        if (defined?(Sidekiq::Testing) && Sidekiq::Testing.inline?)
+        if (ENV['GROUP_TEST_ARGS'] && defined?(Sidekiq::Testing) && Sidekiq::Testing.inline?)
           msg['args'] = [[msg['args']]]
           return yield
         end
