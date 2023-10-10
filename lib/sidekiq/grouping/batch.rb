@@ -7,10 +7,13 @@ module Sidekiq
         @worker_class = worker_class
         @queue = queue
         @name = "#{worker_class.underscore}:#{queue}"
+        @view_name = URI.encode_www_form_component(
+          URI.encode_www_form_component(@name)
+        )
         @redis = Sidekiq::Grouping::Redis.new
       end
 
-      attr_reader :name, :worker_class, :queue
+      attr_reader :name, :worker_class, :queue, :view_name
 
       def add(msg)
         msg = msg.to_json

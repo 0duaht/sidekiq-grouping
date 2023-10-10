@@ -15,9 +15,10 @@ module Sidekiq
         end
 
         app.post "/grouping/:name/delete" do
+          unescaped_name = URI.decode_www_form_component(params["name"])
           worker_class, queue =
             Sidekiq::Grouping::Batch.extract_worker_klass_and_queue(
-              params["name"]
+              unescaped_name
             )
           batch = Sidekiq::Grouping::Batch.new(worker_class, queue)
           batch.delete
